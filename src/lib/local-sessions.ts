@@ -51,6 +51,11 @@ export function canOpenLoginWindow() {
   return true;
 }
 
+/** Where the copy running on the user's own PC can be reached from the browser. */
+export function localAppUrl() {
+  return process.env.LOCAL_APP_URL?.trim().replace(/\/$/, "") || "http://localhost:6464";
+}
+
 function isCmcCookie(c: { domain?: string }) {
   const domain = String(c.domain || "");
   return domain.includes("coinmarketcap.com") || domain.includes("cmc.com");
