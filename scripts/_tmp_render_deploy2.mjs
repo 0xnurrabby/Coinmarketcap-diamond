@@ -16,9 +16,14 @@ const dep = await fetch(`https://api.render.com/v1/services/${id}/deploys`, {
   headers: h,
   body: JSON.stringify({ clearCache: "clear" }),
 });
-const created = await dep.json();
-const deployId = created.id;
-console.log("triggered:", dep.status, deployId);
+console.log("triggered:", dep.status);
+await dep.text();
+
+await new Promise((r) => setTimeout(r, 5000));
+const listRes = await fetch(`https://api.render.com/v1/services/${id}/deploys?limit=1`, { headers: h });
+const list = await listRes.json();
+const deployId = (list[0]?.deploy || list[0]).id;
+console.log("watching deploy:", deployId);
 
 const strip = (s) =>
   String(s)
