@@ -138,7 +138,7 @@ export function AccountsClient({
   }, [captureId, captureSession]);
 
   async function addAccount() {
-    const win = openLiveWindow();
+    const win = browserMode === "steel" ? openLiveWindow() : null;
     setBusy("add");
     setError("");
     try {
@@ -162,7 +162,7 @@ export function AccountsClient({
   }
 
   async function startLogin(account: Account, win?: Window | null) {
-    const live = win ?? openLiveWindow();
+    const live = browserMode === "steel" ? win ?? openLiveWindow() : null;
     setBusy(account.id);
     setError("");
     try {
