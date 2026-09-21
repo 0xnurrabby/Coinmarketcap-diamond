@@ -81,8 +81,6 @@ export async function initDb() {
       await sql`ALTER TABLE cmc_accounts ADD COLUMN IF NOT EXISTS cmc_email TEXT`;
       await sql`ALTER TABLE cmc_accounts ADD COLUMN IF NOT EXISTS cmc_password_enc TEXT`;
       await sql`ALTER TABLE cmc_accounts ADD COLUMN IF NOT EXISTS session_expires_at TIMESTAMPTZ`;
-      await sql`ALTER TABLE cmc_accounts ADD COLUMN IF NOT EXISTS steel_session_id TEXT`;
-      await sql`ALTER TABLE cmc_accounts ADD COLUMN IF NOT EXISTS steel_viewer_url TEXT`;
 
       await sql`
         CREATE TABLE IF NOT EXISTS activities (

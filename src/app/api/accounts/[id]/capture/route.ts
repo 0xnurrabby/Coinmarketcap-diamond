@@ -52,7 +52,7 @@ export async function POST(
     `;
     await sql`
       INSERT INTO activities (id, user_id, account_id, type, message)
-      VALUES (${uuidv4()}, ${user.id}, ${id}, 'session_captured', ${`Steel session captured (${cookies.length} cookies)`})
+      VALUES (${uuidv4()}, ${user.id}, ${id}, 'session_captured', ${`Session captured (${cookies.length} cookies)`})
     `;
 
     const updated = (

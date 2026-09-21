@@ -28,16 +28,10 @@ async function readJson(res: Response) {
   }
 }
 
-function openLiveWindow() {
-  const win = window.open("about:blank", "_blank");
-  if (win) win.opener = null;
-  return win;
-}
-
 export function AccountsClient({
   browserMode,
 }: {
-  browserMode: "local" | "steel";
+  browserMode: "local" | "cloud";
 }) {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [open, setOpen] = useState(false);
@@ -138,7 +132,6 @@ export function AccountsClient({
   }, [captureId, captureSession]);
 
   async function addAccount() {
-    const win = browserMode === "steel" ? openLiveWindow() : null;
     setBusy("add");
     setError("");
     try {
@@ -152,9 +145,8 @@ export function AccountsClient({
       setOpen(false);
       setName("");
       await load();
-      await startLogin(data.account as Account, win);
+      await startLogin(data.account as Account);
     } catch (err) {
-      if (win && !win.closed) win.close();
       setError(err instanceof Error ? err.message : "Failed");
     } finally {
       setBusy(null);
@@ -162,7 +154,6 @@ export function AccountsClient({
   }
 
   async function startLogin(account: Account, win?: Window | null) {
-    const live = browserMode === "steel" ? win ?? openLiveWindow() : null;
     setBusy(account.id);
     setError("");
     try {
@@ -171,18 +162,13 @@ export function AccountsClient({
       });
       const data = await readJson(res);
       if (!res.ok) throw new Error(String(data.error || "Failed to open browser"));
-      const viewerUrl = (data.viewerUrl as string) || null;
       setCapture({
         account,
         cookieCount: Number(data.cookieCount || 0),
-        viewerUrl,
+        viewerUrl: null,
       });
-      if (viewerUrl) {
-        if (live && !live.closed) live.location.href = viewerUrl;
-        else window.open(viewerUrl, "_blank");
-      }
     } catch (err) {
-      if (live && !live.closed) live.close();
+      if (win && !win.closed) win.close();
       setError(err instanceof Error ? err.message : "Login failed");
     } finally {
       setBusy(null);
