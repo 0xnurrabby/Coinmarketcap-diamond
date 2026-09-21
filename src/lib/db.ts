@@ -1,11 +1,32 @@
-import { neon } from "@neondatabase/serverless";
+import { neon, type NeonQueryFunction } from "@neondatabase/serverless";
 
-const url = process.env.DATABASE_URL;
-if (!url) {
-  throw new Error("DATABASE_URL is not set");
+type Sql = NeonQueryFunction<false, false>;
+
+let client: Sql | null = null;
+
+function db(): Sql {
+  if (!client) {
+    const url = process.env.DATABASE_URL;
+    if (!url) throw new Error("DATABASE_URL is not set");
+    client = neon(url);
+  }
+  return client;
 }
 
-export const sql = neon(url);
+/**
+ * Lazily created so `next build` never needs DATABASE_URL at build time.
+ */
+export const sql = new Proxy(function () {} as unknown as Sql, {
+  apply(_target, _thisArg, args: unknown[]) {
+    const fn = db() as unknown as (...a: unknown[]) => unknown;
+    return fn(...args);
+  },
+  get(_target, prop) {
+    const c = db() as unknown as Record<string | symbol, unknown>;
+    const value = c[prop];
+    return typeof value === "function" ? value.bind(c) : value;
+  },
+}) as Sql;
 
 let initPromise: Promise<void> | null = null;
 
