@@ -98,21 +98,37 @@ export async function GET(
     }
 
     const local = useLocalBrowser();
-    const status = local
-      ? await getLocalStatus(id)
-      : await getSteelLive(id).then((s) => ({
-          live: s.live,
-          cookieCount: s.cookieCount,
-          viewerUrl: s.viewerUrl,
-          sessionId: s.sessionId,
-        }));
+    type Status = {
+      live: boolean;
+      cookieCount: number;
+      viewerUrl: string | null;
+      sessionId: string | null;
+    };
+    let status: Status;
+    if (local) {
+      const s = await getLocalStatus(id);
+      status = {
+        live: s.live,
+        cookieCount: s.cookieCount,
+        viewerUrl: null,
+        sessionId: null,
+      };
+    } else {
+      const s = await getSteelLive(id);
+      status = {
+        live: s.live,
+        cookieCount: s.cookieCount,
+        viewerUrl: s.viewerUrl,
+        sessionId: s.sessionId,
+      };
+    }
 
     if (!status.live) {
       return json({
         live: false,
         mode: local ? "local" : "steel",
         cookieCount: 0,
-        viewerUrl: local ? null : status.viewerUrl,
+        viewerUrl: status.viewerUrl,
         loginDetected: false,
       });
     }
@@ -137,7 +153,7 @@ export async function GET(
       live: true,
       mode: local ? "local" : "steel",
       cookieCount: status.cookieCount,
-      viewerUrl: local ? null : status.viewerUrl,
+      viewerUrl: status.viewerUrl,
       loginDetected,
     });
   } catch (err) {

@@ -380,8 +380,9 @@ export function AccountsClient({
         onClose={() => void cancelCapture()}
       >
         <p className="text-sm leading-relaxed">
-          Sign in to CoinMarketCap in the live browser. 2FA and captcha are
-          fine — the session is captured automatically once you are logged in.
+          {browserMode === "local"
+            ? "A Chrome window opened on this computer at the CoinMarketCap login page. Sign in there — 2FA and captcha are fine. The session is saved automatically once you are logged in."
+            : "Sign in to CoinMarketCap in the live browser. 2FA and captcha are fine — the session is captured automatically once you are logged in."}
         </p>
         {capture?.viewerUrl ? (
           <a

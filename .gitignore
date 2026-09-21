@@ -50,4 +50,7 @@ next-env.d.ts
 # auto-push watcher log
 /scripts/auto-push.log
 
+# local login browser profiles
+/.local-browser
+
 .vercel
