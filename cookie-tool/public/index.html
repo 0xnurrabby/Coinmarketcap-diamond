@@ -22,18 +22,8 @@
       flex-direction: column;
       gap: 12px;
     }
-    h1 {
-      margin: 0;
-      font-size: 18px;
-      font-weight: 700;
-      text-align: center;
-    }
-    .sub {
-      text-align: center;
-      font-size: 12px;
-      color: #666;
-      margin: -4px 0 8px;
-    }
+    h1 { margin: 0; font-size: 18px; font-weight: 700; text-align: center; }
+    .sub { text-align: center; font-size: 12px; color: #666; margin: -4px 0 8px; }
     input, textarea {
       width: 100%;
       border: 1px solid #ccc;
@@ -44,7 +34,7 @@
     }
     input { height: 44px; }
     textarea {
-      min-height: 140px;
+      min-height: 110px;
       font-family: Consolas, monospace;
       font-size: 11px;
       user-select: text;
@@ -63,6 +53,7 @@
     .login { background: #181d26; color: #fff; }
     .done { background: #0b7a3b; color: #fff; }
     .copy { background: #e8e8e8; color: #111; }
+    .send { background: #1b61c9; color: #fff; }
     button:disabled { opacity: .45; cursor: not-allowed; }
     .status {
       min-height: 36px;
@@ -76,12 +67,23 @@
     }
     .status.err { color: #9e0a0a; background: #fff5f5; }
     .status.ok { color: #0b7a3b; background: #f0fff4; }
+    .card {
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 12px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .card .title { font-size: 12px; font-weight: 700; color: #444; }
+    .card .hint { font-size: 11px; color: #777; }
   </style>
 </head>
 <body>
   <div class="app">
     <h1>CMC Cookie Tool</h1>
-    <div class="sub">Login → Done → Copy → paste on website</div>
+    <div class="sub">Login → Done → Send to website</div>
 
     <input id="name" placeholder="Account name" value="" />
 
@@ -95,12 +97,35 @@
     <textarea id="cookies" placeholder="Cookies will appear here after Done" readonly></textarea>
 
     <button class="copy" id="btnCopy" disabled>Copy cookies</button>
+
+    <div class="card">
+      <div class="title">Send to website (one click)</div>
+      <input id="apiBase" placeholder="Website URL (https://your-app.onrender.com)" />
+      <input id="sitePassword" placeholder="Site password" />
+      <input id="email" placeholder="Your website login email" />
+      <input id="password" type="password" placeholder="Your website login password" />
+      <div class="hint">Saved on this PC, next time auto-filled.</div>
+      <button class="send" id="btnSend" disabled>Send to website</button>
+    </div>
   </div>
 
   <script>
     let key = null;
     let poll = null;
     const $ = (id) => document.getElementById(id);
+    const FIELDS = ["apiBase", "sitePassword", "email", "password"];
+
+    FIELDS.forEach((id) => {
+      try {
+        const saved = localStorage.getItem("dc_" + id);
+        if (saved) $(id).value = saved;
+      } catch {}
+      $(id).addEventListener("input", () => {
+        try {
+          localStorage.setItem("dc_" + id, $(id).value.trim());
+        } catch {}
+      });
+    });
 
     function status(text, type) {
       const el = $("status");
@@ -113,11 +138,16 @@
       $("btnLogin").disabled = on;
     }
 
+    function setCookies(json) {
+      $("cookies").value = json || "";
+      $("btnCopy").disabled = !json;
+      $("btnSend").disabled = !json;
+    }
+
     $("btnLogin").onclick = async () => {
       const name = $("name").value.trim();
       if (!name) return status("Account name required", "err");
-      $("cookies").value = "";
-      $("btnCopy").disabled = true;
+      setCookies("");
       status("Opening browser…");
       try {
         const res = await fetch("/api/login", {
@@ -163,9 +193,11 @@
         key = null;
         setLive(false);
         if (poll) clearInterval(poll);
-        $("cookies").value = data.cookiesJson || "";
-        $("btnCopy").disabled = !$("cookies").value;
-        status("Done. " + data.cookieCount + " cookies. Click Copy, then paste on website Session.", "ok");
+        setCookies(data.cookiesJson || "");
+        status(
+          "Done. " + data.cookieCount + " cookies. Now click Send to website.",
+          "ok"
+        );
       } catch (e) {
         status(e.message, "err");
       }
@@ -176,11 +208,44 @@
       if (!text) return;
       try {
         await navigator.clipboard.writeText(text);
-        status("Copied. Paste into website → Accounts → Session.", "ok");
+        status("Copied. Paste into website → Accounts → Paste.", "ok");
       } catch {
         $("cookies").select();
         document.execCommand("copy");
         status("Copied.", "ok");
+      }
+    };
+
+    $("btnSend").onclick = async () => {
+      const apiBase = $("apiBase").value.trim().replace(/\/$/, "");
+      const accountName = $("name").value.trim();
+      const cookiesJson = $("cookies").value;
+      if (!apiBase) return status("Website URL required", "err");
+      if (!accountName) return status("Account name required", "err");
+      if (!cookiesJson) return status("Capture cookies first (Done)", "err");
+
+      $("btnSend").disabled = true;
+      status("Sending to website…");
+      try {
+        const res = await fetch("/api/upload", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            apiBase,
+            sitePassword: $("sitePassword").value,
+            email: $("email").value.trim(),
+            password: $("password").value,
+            accountName,
+            cookiesJson,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Upload failed");
+        status("Sent! Account is active on the website.", "ok");
+      } catch (e) {
+        status(e.message, "err");
+      } finally {
+        $("btnSend").disabled = !$("cookies").value;
       }
     };
   </script>
