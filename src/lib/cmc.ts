@@ -190,24 +190,19 @@ export async function claimAccount(accountId: string, opts?: { force?: boolean }
     );
 
     if (!snap.loggedIn) {
-      const message = "Session expired — log in to CoinMarketCap again";
-      await failAccount(account, message, true);
-      throw new Error(message);
+      throw new Error("Session expired — log in to CoinMarketCap again");
     }
     if (snap.claimStatus === "error") {
-      await failAccount(account, snap.claimMessage, false);
       throw new Error(snap.claimMessage);
     }
 
     return await saveSnapshot(account, snap);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Claim failed";
-    if (!account.last_error || account.last_error !== message) {
-      const sessionBad = /session|invalid|login|cookie|logged in|unauthorized|expired/i.test(
-        message
-      );
-      await failAccount(account, message, sessionBad);
-    }
+    const sessionBad = /session|invalid|login|cookie|logged in|unauthorized|expired/i.test(
+      message
+    );
+    await failAccount(account, message, sessionBad);
     throw err;
   }
 }
@@ -298,7 +293,26 @@ export async function claimAllForUser(userId: string) {
     WHERE user_id = ${userId} AND cookies_json IS NOT NULL
     ORDER BY created_at ASC
   `) as CmcAccount[];
-  return claimBatch(accounts);
+
+  const today = todayUTC();
+  const results: Array<Record<string, unknown>> = [];
+  const pending: CmcAccount[] = [];
+  for (const account of accounts) {
+    if (dayString(account.claimed_date) === today) {
+      results.push({
+        id: account.id,
+        name: account.name,
+        ok: true,
+        skipped: true,
+        message: "Already claimed today",
+        diamonds: account.diamonds,
+      });
+    } else {
+      pending.push(account);
+    }
+  }
+  results.push(...(await claimBatch(pending)));
+  return results;
 }
 
 export async function claimDueAccounts() {

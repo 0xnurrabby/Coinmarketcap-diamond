@@ -117,6 +117,17 @@ export type CmcAccount = {
   updated_at: string;
 };
 
+export function dayString(value: unknown): string | null {
+  if (!value) return null;
+  if (value instanceof Date) {
+    const y = value.getFullYear();
+    const m = String(value.getMonth() + 1).padStart(2, "0");
+    const d = String(value.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  }
+  return String(value).slice(0, 10);
+}
+
 export function publicAccount(a: CmcAccount) {
   const today = new Date().toISOString().slice(0, 10);
   return {
@@ -128,7 +139,7 @@ export function publicAccount(a: CmcAccount) {
     autoClaim: a.auto_claim,
     lastClaimAt: a.last_claim_at,
     nextClaimAt: a.next_claim_at,
-    claimedToday: a.claimed_date === today,
+    claimedToday: dayString(a.claimed_date) === today,
     streak: a.streak,
     lastError: a.last_error,
     hasSession: Boolean(a.cookies_json),
