@@ -35,10 +35,10 @@ function store() {
   return globalThis.__cmcLocalSessions;
 }
 
-/** Local dev uses a real Chrome window on this PC; cloud hosts fall back to Steel. */
-export function useLocalBrowser() {
+/** True only where a visible browser window can actually be opened (this PC). */
+export function canOpenLoginWindow() {
   const mode = process.env.LOGIN_BROWSER?.trim().toLowerCase();
-  if (mode === "steel") return false;
+  if (mode === "off") return false;
   if (mode === "local") return true;
   if (
     process.env.VERCEL ||

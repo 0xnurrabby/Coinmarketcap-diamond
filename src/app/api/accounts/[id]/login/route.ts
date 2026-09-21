@@ -2,18 +2,12 @@ import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
 import { initDb, sql } from "@/lib/db";
 import {
+  canOpenLoginWindow,
   closeLocalLogin,
   getLocalStatus,
   isLocalLoggedIn,
   openLocalLogin,
-  useLocalBrowser,
 } from "@/lib/local-sessions";
-import {
-  getSteelLive,
-  isCmcLoggedIn,
-  openSteelLogin,
-  releaseSteel,
-} from "@/lib/steel-sessions";
 
 export const maxDuration = 60;
 export const runtime = "nodejs";
@@ -50,33 +44,25 @@ export async function POST(
       return json({ error: "Account not found" }, 404);
     }
 
-    if (useLocalBrowser()) {
-      await openLocalLogin(id);
-      verifyState.delete(id);
-      return json({
-        ok: true,
-        mode: "local",
-        viewerUrl: null,
-        cookieCount: 0,
-        message:
-          "Chrome window opened on this computer at the CMC login page. Sign in — the session is captured automatically.",
-      });
+    if (!canOpenLoginWindow()) {
+      return json(
+        {
+          error:
+            "This hosted copy cannot open a browser on your computer. Log in from the app running on your PC, or use Paste with cookies from the Cookie Tool.",
+        },
+        400
+      );
     }
 
-    if (!process.env.STEEL_API_KEY?.trim()) {
-      return json({ error: "STEEL_API_KEY missing" }, 500);
-    }
-
-    const info = await openSteelLogin(id);
+    await openLocalLogin(id);
     verifyState.delete(id);
     return json({
       ok: true,
-      mode: "steel",
-      sessionId: info.sessionId,
-      viewerUrl: info.viewerUrl,
+      mode: "local",
+      viewerUrl: null,
       cookieCount: 0,
       message:
-        "Live browser opened on the CMC login page. Sign in — the session is captured automatically.",
+        "Chrome window opened at the CoinMarketCap login page. Sign in — the session is saved automatically.",
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -97,38 +83,23 @@ export async function GET(
       return json({ error: "Not found" }, 404);
     }
 
-    const local = useLocalBrowser();
-    type Status = {
-      live: boolean;
-      cookieCount: number;
-      viewerUrl: string | null;
-      sessionId: string | null;
-    };
-    let status: Status;
-    if (local) {
-      const s = await getLocalStatus(id);
-      status = {
-        live: s.live,
-        cookieCount: s.cookieCount,
+    if (!canOpenLoginWindow()) {
+      return json({
+        live: false,
+        mode: "cloud",
+        cookieCount: 0,
         viewerUrl: null,
-        sessionId: null,
-      };
-    } else {
-      const s = await getSteelLive(id);
-      status = {
-        live: s.live,
-        cookieCount: s.cookieCount,
-        viewerUrl: s.viewerUrl,
-        sessionId: s.sessionId,
-      };
+        loginDetected: false,
+      });
     }
 
+    const status = await getLocalStatus(id);
     if (!status.live) {
       return json({
         live: false,
-        mode: local ? "local" : "steel",
+        mode: "local",
         cookieCount: 0,
-        viewerUrl: status.viewerUrl,
+        viewerUrl: null,
         loginDetected: false,
       });
     }
@@ -140,9 +111,7 @@ export async function GET(
       loginDetected = prev.detected;
     } else {
       try {
-        loginDetected = local
-          ? await isLocalLoggedIn(id)
-          : await isCmcLoggedIn(status.sessionId as string);
+        loginDetected = await isLocalLoggedIn(id);
       } catch {
         loginDetected = false;
       }
@@ -151,9 +120,9 @@ export async function GET(
 
     return json({
       live: true,
-      mode: local ? "local" : "steel",
+      mode: "local",
       cookieCount: status.cookieCount,
-      viewerUrl: status.viewerUrl,
+      viewerUrl: null,
       loginDetected,
     });
   } catch (err) {
@@ -171,11 +140,7 @@ export async function DELETE(
     if (!user) return json({ error: "Unauthorized" }, 401);
     const { id } = await params;
     verifyState.delete(id);
-    if (useLocalBrowser()) {
-      await closeLocalLogin(id);
-      return json({ ok: true });
-    }
-    await releaseSteel(id);
+    await closeLocalLogin(id);
     return json({ ok: true });
   } catch (err) {
     return json({

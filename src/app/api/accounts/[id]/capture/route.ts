@@ -2,8 +2,7 @@ import { NextResponse } from "next/server";
 import { v4 as uuidv4 } from "uuid";
 import { getSessionUser } from "@/lib/auth";
 import { initDb, publicAccount, sql, type CmcAccount } from "@/lib/db";
-import { captureLocalCookies, useLocalBrowser } from "@/lib/local-sessions";
-import { captureSteelCookies } from "@/lib/steel-sessions";
+import { canOpenLoginWindow, captureLocalCookies } from "@/lib/local-sessions";
 
 export const maxDuration = 60;
 export const runtime = "nodejs";
@@ -27,9 +26,17 @@ export async function POST(
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
-    const cookies = useLocalBrowser()
-      ? await captureLocalCookies(id)
-      : await captureSteelCookies(id);
+    if (!canOpenLoginWindow()) {
+      return NextResponse.json(
+        {
+          error:
+            "This hosted copy cannot read a browser session. Paste cookies from the Cookie Tool instead.",
+        },
+        { status: 400 }
+      );
+    }
+
+    const cookies = await captureLocalCookies(id);
     const expires = new Date(
       Date.now() + 150 * 24 * 60 * 60 * 1000
     ).toISOString();
