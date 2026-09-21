@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { v4 as uuidv4 } from "uuid";
 import { getSessionUser } from "@/lib/auth";
 import { initDb, publicAccount, sql, type CmcAccount } from "@/lib/db";
+import { captureLocalCookies, useLocalBrowser } from "@/lib/local-sessions";
 import { captureSteelCookies } from "@/lib/steel-sessions";
 
 export const maxDuration = 60;
@@ -26,7 +27,9 @@ export async function POST(
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
-    const cookies = await captureSteelCookies(id);
+    const cookies = useLocalBrowser()
+      ? await captureLocalCookies(id)
+      : await captureSteelCookies(id);
     const expires = new Date(
       Date.now() + 150 * 24 * 60 * 60 * 1000
     ).toISOString();
