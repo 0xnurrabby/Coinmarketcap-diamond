@@ -114,16 +114,10 @@ function Skeleton() {
   );
 }
 
-function openLiveWindow() {
-  const win = window.open("about:blank", "_blank");
-  if (win) win.opener = null;
-  return win;
-}
-
 export function DashboardClient({
   browserMode,
 }: {
-  browserMode: "local" | "steel";
+  browserMode: "local" | "cloud";
 }) {
   const [stats, setStats] = useState<Stats | null>(null);
   const [accounts, setAccounts] = useState<Account[] | null>(null);
@@ -228,8 +222,7 @@ export function DashboardClient({
     };
   }, [captureId, captureSession]);
 
-  async function startLogin(account: Account, win?: Window | null) {
-    const live = browserMode === "steel" ? win ?? openLiveWindow() : null;
+  async function startLogin(account: Account) {
     setBusy(account.id);
     setError("");
     setNotice("");
@@ -242,15 +235,9 @@ export function DashboardClient({
       setCapture({
         account,
         cookieCount: 0,
-        viewerUrl: (data.viewerUrl as string) || null,
+        viewerUrl: null,
       });
-      if (data.viewerUrl) {
-        const url = String(data.viewerUrl);
-        if (live && !live.closed) live.location.href = url;
-        else window.open(url, "_blank");
-      }
     } catch (err) {
-      if (live && !live.closed) live.close();
       setError(err instanceof Error ? err.message : "Login failed");
     } finally {
       setBusy(null);
@@ -258,7 +245,6 @@ export function DashboardClient({
   }
 
   async function addAccount() {
-    const win = browserMode === "steel" ? openLiveWindow() : null;
     setBusy("add");
     setError("");
     try {
@@ -272,9 +258,8 @@ export function DashboardClient({
       setAddOpen(false);
       setName("");
       await load();
-      await startLogin(data.account as Account, win);
+      await startLogin(data.account as Account);
     } catch (err) {
-      if (win && !win.closed) win.close();
       setError(err instanceof Error ? err.message : "Failed");
     } finally {
       setBusy(null);
@@ -536,19 +521,9 @@ export function DashboardClient({
       >
         <p className="text-sm leading-relaxed">
           {browserMode === "local"
-            ? "A Chrome window opened on this computer at the CoinMarketCap login page. Sign in there — 2FA and captcha are fine. The session is saved automatically."
-            : "Sign in to CoinMarketCap in the live browser. The session is captured automatically once you are logged in."}
+            ? "A Chrome window opened at the CoinMarketCap login page. Sign in there — 2FA and captcha are fine. The session is saved automatically."
+            : "Login opens a browser window on the computer that runs this app. On this hosted copy, log in from the app on your PC or paste cookies with the Paste button."}
         </p>
-        {capture?.viewerUrl ? (
-          <a
-            href={capture.viewerUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="mt-3 inline-flex h-10 items-center justify-center rounded-full bg-primary px-4 text-sm font-bold text-white"
-          >
-            Open live browser
-          </a>
-        ) : null}
         <p className="mt-3 text-sm text-muted flex items-center gap-2">
           <span className="h-3.5 w-3.5 rounded-full border-2 border-hairline border-t-ink animate-spin" />
           Waiting for login… ({capture?.cookieCount ?? 0} cookies)
