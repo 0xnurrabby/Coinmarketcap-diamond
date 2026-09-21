@@ -47,4 +47,7 @@ next-env.d.ts
 /cookie-tool/dist
 /cookie-tool/portable
 
+# auto-push watcher log
+/scripts/auto-push.log
+
 .vercel
