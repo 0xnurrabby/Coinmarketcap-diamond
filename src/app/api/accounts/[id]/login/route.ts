@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
-import { initDb, sql, type CmcAccount } from "@/lib/db";
+import { initDb, sql } from "@/lib/db";
 import { verifySession } from "@/lib/cmc";
 import {
   getSteelLive,
@@ -47,7 +47,8 @@ export async function POST(
       sessionId: info.sessionId,
       viewerUrl: info.viewerUrl,
       cookieCount: 0,
-      message: "Open live browser, login to CMC, then Capture session.",
+      message:
+        "Live browser opened on the CMC login page. Sign in — the session is captured automatically.",
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
