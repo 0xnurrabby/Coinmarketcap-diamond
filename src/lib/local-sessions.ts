@@ -35,12 +35,20 @@ function store() {
   return globalThis.__cmcLocalSessions;
 }
 
-/** Local dev uses a real Chrome window on this PC; Vercel falls back to Steel. */
+/** Local dev uses a real Chrome window on this PC; cloud hosts fall back to Steel. */
 export function useLocalBrowser() {
   const mode = process.env.LOGIN_BROWSER?.trim().toLowerCase();
   if (mode === "steel") return false;
   if (mode === "local") return true;
-  return !process.env.VERCEL;
+  if (
+    process.env.VERCEL ||
+    process.env.RENDER ||
+    process.env.FLY_APP_NAME ||
+    process.env.RAILWAY_ENVIRONMENT
+  ) {
+    return false;
+  }
+  return true;
 }
 
 function isCmcCookie(c: { domain?: string }) {
