@@ -174,25 +174,6 @@ export function AccountsClient() {
     }
   }
 
-  async function captureSession() {
-    if (!capture) return;
-    setBusy(capture.account.id);
-    setError("");
-    try {
-      const res = await fetch(`/api/accounts/${capture.account.id}/capture`, {
-        method: "POST",
-      });
-      const data = await readJson(res);
-      if (!res.ok) throw new Error(String(data.error || "Capture failed"));
-      setCapture(null);
-      await load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Capture failed");
-    } finally {
-      setBusy(null);
-    }
-  }
-
   async function cancelCapture() {
     if (!capture) return;
     await fetch(`/api/accounts/${capture.account.id}/login`, { method: "DELETE" });
@@ -263,7 +244,8 @@ export function AccountsClient() {
         <div>
           <h1 className="text-2xl font-medium text-ink">Accounts</h1>
           <p className="text-sm text-muted mt-1">
-            Login opens Steel live browser → 2FA/captcha → Capture session
+            Login opens a live browser → sign in to CMC → session saved
+            automatically
           </p>
         </div>
         <Button onClick={() => setOpen(true)}>+ Add account</Button>
@@ -383,8 +365,8 @@ export function AccountsClient() {
         onClose={() => void cancelCapture()}
       >
         <p className="text-sm leading-relaxed">
-          Live browser opened (Steel). Log into CoinMarketCap there — 2FA and
-          captcha are fine. Then click <strong>Capture session</strong>.
+          Sign in to CoinMarketCap in the live browser. 2FA and captcha are
+          fine — the session is captured automatically once you are logged in.
         </p>
         {capture?.viewerUrl ? (
           <a
@@ -397,7 +379,7 @@ export function AccountsClient() {
           </a>
         ) : null}
         <p className="mt-3 text-sm text-muted">
-          Waiting… ({capture?.cookieCount ?? 0} cookies)
+          Waiting for login… ({capture?.cookieCount ?? 0} cookies)
         </p>
         <div className="mt-5 flex justify-end gap-2">
           <Button variant="secondary" onClick={() => void cancelCapture()}>
@@ -405,9 +387,11 @@ export function AccountsClient() {
           </Button>
           <Button
             disabled={busy === capture?.account.id}
-            onClick={() => void captureSession()}
+            onClick={() => {
+              if (capture) void captureSession(capture.account.id);
+            }}
           >
-            Capture session
+            Capture now
           </Button>
         </div>
       </Modal>
