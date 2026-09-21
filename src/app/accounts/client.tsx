@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Badge, Button, Card, Input, Modal, Textarea } from "@/components/ui";
 
 type Account = {
@@ -58,6 +58,22 @@ export function AccountsClient({
   useEffect(() => {
     void load();
   }, [load]);
+
+  const autoStarted = useRef(false);
+
+  useEffect(() => {
+    if (autoStarted.current || !accounts) return;
+    const loginId = new URLSearchParams(window.location.search).get("login");
+    if (!loginId) return;
+    autoStarted.current = true;
+    window.history.replaceState({}, "", window.location.pathname);
+    const account = accounts.find((a) => a.id === loginId);
+    if (account) {
+      const id = window.setTimeout(() => void startLogin(account), 0);
+      return () => window.clearTimeout(id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accounts]);
 
   const captureSession = useCallback(
     async (accountId: string) => {
