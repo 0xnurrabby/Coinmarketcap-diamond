@@ -116,8 +116,10 @@ function Skeleton() {
 
 export function DashboardClient({
   browserMode,
+  localAppUrl,
 }: {
   browserMode: "local" | "cloud";
+  localAppUrl: string | null;
 }) {
   const [stats, setStats] = useState<Stats | null>(null);
   const [accounts, setAccounts] = useState<Account[] | null>(null);
@@ -173,7 +175,7 @@ export function DashboardClient({
   const captureId = capture?.account.id ?? null;
 
   useEffect(() => {
-    if (!captureId) return;
+    if (!captureId || browserMode !== "local") return;
     let cancelled = false;
     let capturing = false;
     let busyTick = false;
@@ -223,9 +225,15 @@ export function DashboardClient({
   }, [captureId, captureSession]);
 
   async function startLogin(account: Account) {
-    setBusy(account.id);
     setError("");
     setNotice("");
+
+    if (browserMode === "cloud") {
+      setCapture({ account, cookieCount: 0, viewerUrl: null });
+      return;
+    }
+
+    setBusy(account.id);
     try {
       const res = await fetch(`/api/accounts/${account.id}/login`, {
         method: "POST",
