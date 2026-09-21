@@ -27,10 +27,16 @@ export function AppNav({
   }
 
   return (
-    <header className="sticky top-0 z-40 bg-canvas border-b border-hairline">
-      <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between gap-3">
+    <header className="sticky top-0 z-40 bg-canvas/90 backdrop-blur border-b border-hairline">
+      <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between gap-3">
         <div className="flex items-center gap-5 min-w-0">
-          <Link href="/dashboard" className="font-medium text-ink shrink-0">
+          <Link
+            href="/dashboard"
+            className="font-semibold text-ink shrink-0 flex items-center gap-2"
+          >
+            <span className="grid h-6 w-6 place-items-center rounded-lg bg-gradient-to-br from-indigo-500 via-violet-500 to-fuchsia-500 text-white text-[11px] shadow-sm">
+              ◆
+            </span>
             DiamondClaim
           </Link>
           <nav className="hidden sm:flex items-center gap-1">
@@ -38,10 +44,10 @@ export function AppNav({
               <Link
                 key={l.href}
                 href={l.href}
-                className={`px-3 py-1.5 rounded-full text-sm ${
+                className={`px-3 py-1.5 rounded-full text-sm transition-all duration-200 ${
                   pathname.startsWith(l.href)
-                    ? "bg-surface-strong text-ink"
-                    : "text-muted hover:text-ink"
+                    ? "bg-surface-strong text-ink font-medium"
+                    : "text-muted hover:text-ink hover:bg-surface-soft"
                 }`}
               >
                 {l.label}
