@@ -13,6 +13,62 @@ function steelHeaders() {
   };
 }
 
+export type SteelCookie = {
+  name: string;
+  value: string;
+  domain?: string;
+  path?: string;
+  [key: string]: unknown;
+};
+
+const CMC_DIAMONDS_URL = "https://coinmarketcap.com/account/my-diamonds/";
+
+/**
+ * Navigate the Steel session to the CMC login entry point.
+ * Best effort: if the login modal does not open, the user can click it manually.
+ */
+async function openCmcLoginPage(sessionId: string) {
+  const { chromium } = await import("playwright-core");
+  const wsUrl = `wss://connect.steel.dev?sessionId=${sessionId}&apiKey=${encodeURIComponent(
+    apiKey()
+  )}`;
+  const browser = await chromium.connectOverCDP(wsUrl, { timeout: 45000 });
+  try {
+    const context = browser.contexts()[0];
+    if (!context) return;
+    const page = context.pages()[0] || (await context.newPage());
+    await page.goto(CMC_DIAMONDS_URL, {
+      waitUntil: "domcontentloaded",
+      timeout: 60000,
+    });
+    const loginBtn = page.locator('button[data-btnname="Log In to Collect"]');
+    try {
+      await loginBtn.first().click({ timeout: 8000 });
+      await page.waitForTimeout(1500);
+    } catch {
+      /* already logged in, or modal opened by the user */
+    }
+  } finally {
+    await browser.close().catch(() => null);
+  }
+}
+
+export async function getSteelContextCookies(
+  sessionId: string
+): Promise<SteelCookie[]> {
+  const res = await fetch(
+    `https://api.steel.dev/v1/sessions/${sessionId}/context`,
+    { headers: { "steel-api-key": apiKey() }, cache: "no-store" }
+  );
+  if (!res.ok) return [];
+  const data = (await res.json()) as { cookies?: SteelCookie[] };
+  return (data.cookies || []).filter(
+    (c) =>
+      String(c.domain || "").includes("coinmarketcap.com") ||
+      String(c.domain || "").includes("cmc.com")
+  );
+}
+
 /** Create Steel live session only (no Playwright) — works on Vercel. */
 export async function openSteelLogin(accountId: string) {
   await initDb();
@@ -24,7 +80,6 @@ export async function openSteelLogin(accountId: string) {
     body: JSON.stringify({
       timeout: 1_800_000,
       inactivityTimeout: 900_000,
-      solveCaptcha: true,
       headless: false,
       dimensions: { width: 1280, height: 900 },
     }),
