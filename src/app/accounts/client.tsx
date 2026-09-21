@@ -59,27 +59,71 @@ export function AccountsClient() {
     void load();
   }, [load]);
 
+  const captureSession = useCallback(
+    async (accountId: string) => {
+      setBusy(accountId);
+      setError("");
+      try {
+        const res = await fetch(`/api/accounts/${accountId}/capture`, {
+          method: "POST",
+        });
+        const data = await readJson(res);
+        if (!res.ok) throw new Error(String(data.error || "Capture failed"));
+        setCapture(null);
+        await load();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Capture failed");
+      } finally {
+        setBusy(null);
+      }
+    },
+    [load]
+  );
+
+  const captureId = capture?.account.id ?? null;
+
   useEffect(() => {
-    if (!capture) return;
-    const t = setInterval(async () => {
-      const res = await fetch(`/api/accounts/${capture.account.id}/login`);
-      if (!res.ok) return;
-      const data = await res.json();
-      setCapture((c) =>
-        c
-          ? {
-              ...c,
-              cookieCount: data.cookieCount || 0,
-              viewerUrl: data.viewerUrl ?? c.viewerUrl,
-            }
-          : c
-      );
-      if (!data.live) setCapture(null);
-    }, 1500);
-    return () => clearInterval(t);
-  }, [capture]);
+    if (!captureId) return;
+    let cancelled = false;
+    let capturing = false;
+
+    const tick = async () => {
+      if (cancelled || capturing) return;
+      try {
+        const res = await fetch(`/api/accounts/${captureId}/login`);
+        if (!res.ok || cancelled) return;
+        const data = await res.json();
+        if (cancelled) return;
+        setCapture((c) =>
+          c
+            ? {
+                ...c,
+                cookieCount: data.cookieCount || 0,
+                viewerUrl: data.viewerUrl ?? c.viewerUrl,
+              }
+            : c
+        );
+        if (data.loginDetected) {
+          capturing = true;
+          await captureSession(captureId);
+        } else if (!data.live) {
+          setCapture(null);
+        }
+      } catch {
+        /* keep polling */
+      }
+    };
+
+    void tick();
+    const t = setInterval(() => void tick(), 4000);
+    return () => {
+      cancelled = true;
+      clearInterval(t);
+    };
+  }, [captureId, captureSession]);
 
   async function addAccount() {
+    const win = openLiveWindow();
     setBusy("add");
     setError("");
     try {
@@ -93,28 +137,17 @@ export function AccountsClient() {
       setOpen(false);
       setName("");
       await load();
-      await startLogin(data.account as Account);
+      await startLogin(data.account as Account, win);
     } catch (err) {
+      if (win && !win.closed) win.close();
       setError(err instanceof Error ? err.message : "Failed");
     } finally {
       setBusy(null);
     }
   }
 
-  async function readJson(res: Response) {
-    const text = await res.text();
-    try {
-      return JSON.parse(text) as Record<string, unknown>;
-    } catch {
-      throw new Error(
-        text.startsWith("<!DOCTYPE") || text.startsWith("<html")
-          ? `Server error (HTTP ${res.status}). Try again in a few seconds.`
-          : text.slice(0, 240) || `HTTP ${res.status}`
-      );
-    }
-  }
-
-  async function startLogin(account: Account) {
+  async function startLogin(account: Account, win?: Window | null) {
+    const live = win ?? openLiveWindow();
     setBusy(account.id);
     setError("");
     try {
@@ -123,15 +156,18 @@ export function AccountsClient() {
       });
       const data = await readJson(res);
       if (!res.ok) throw new Error(String(data.error || "Failed to open browser"));
+      const viewerUrl = (data.viewerUrl as string) || null;
       setCapture({
         account,
         cookieCount: Number(data.cookieCount || 0),
-        viewerUrl: (data.viewerUrl as string) || null,
+        viewerUrl,
       });
-      if (data.viewerUrl) {
-        window.open(String(data.viewerUrl), "_blank", "noopener,noreferrer");
+      if (viewerUrl) {
+        if (live && !live.closed) live.location.href = viewerUrl;
+        else window.open(viewerUrl, "_blank");
       }
     } catch (err) {
+      if (live && !live.closed) live.close();
       setError(err instanceof Error ? err.message : "Login failed");
     } finally {
       setBusy(null);
