@@ -393,27 +393,61 @@ export function AccountsClient({
         title={capture ? `Log in: ${capture.account.name}` : ""}
         onClose={() => void cancelCapture()}
       >
-        <p className="text-sm leading-relaxed">
-          {browserMode === "local"
-            ? "A Chrome window opened at the CoinMarketCap login page. Sign in there — 2FA and captcha are fine. The session is saved automatically once you are logged in."
-            : "Login opens a browser window on the computer that runs this app. On this hosted copy, log in from the app on your PC or paste cookies with the Paste button."}
-        </p>
-        <p className="mt-3 text-sm text-muted">
-          Waiting for login… ({capture?.cookieCount ?? 0} cookies)
-        </p>
-        <div className="mt-5 flex justify-end gap-2">
-          <Button variant="secondary" onClick={() => void cancelCapture()}>
-            Cancel
-          </Button>
-          <Button
-            disabled={busy === capture?.account.id}
-            onClick={() => {
-              if (capture) void captureSession(capture.account.id);
-            }}
-          >
-            Capture now
-          </Button>
-        </div>
+        {browserMode === "local" ? (
+          <>
+            <p className="text-sm leading-relaxed">
+              A Chrome window opened at the CoinMarketCap login page. Sign in
+              there — 2FA and captcha are fine. The session is saved
+              automatically once you are logged in.
+            </p>
+            <p className="mt-3 text-sm text-muted">
+              Waiting for login… ({capture?.cookieCount ?? 0} cookies)
+            </p>
+            <div className="mt-5 flex justify-end gap-2">
+              <Button variant="secondary" onClick={() => void cancelCapture()}>
+                Cancel
+              </Button>
+              <Button
+                disabled={busy === capture?.account.id}
+                onClick={() => {
+                  if (capture) void captureSession(capture.account.id);
+                }}
+              >
+                Capture now
+              </Button>
+            </div>
+          </>
+        ) : (
+          <>
+            <p className="text-sm leading-relaxed">
+              Login opens a browser window on your own computer. Open the app on
+              your PC and sign in to CoinMarketCap there — this hosted copy
+              reads the same database, so the session shows up here
+              automatically.
+            </p>
+            {localAppUrl && capture ? (
+              <a
+                href={`${localAppUrl}/accounts?login=${encodeURIComponent(
+                  capture.account.id
+                )}`}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-4 inline-flex h-10 items-center justify-center rounded-full bg-primary px-4 text-sm font-bold text-white transition hover:bg-primary-active"
+              >
+                Open on my PC →
+              </a>
+            ) : null}
+            <p className="mt-3 text-xs text-muted">
+              If that tab cannot connect, start the app on your PC first
+              (npm run dev), then click again.
+            </p>
+            <div className="mt-5 flex justify-end">
+              <Button variant="secondary" onClick={() => void cancelCapture()}>
+                Close
+              </Button>
+            </div>
+          </>
+        )}
       </Modal>
 
       <Modal
