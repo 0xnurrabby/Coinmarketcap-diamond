@@ -34,7 +34,11 @@ function openLiveWindow() {
   return win;
 }
 
-export function AccountsClient() {
+export function AccountsClient({
+  browserMode,
+}: {
+  browserMode: "local" | "steel";
+}) {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");

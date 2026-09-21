@@ -1,5 +1,5 @@
 import path from "node:path";
-import { chromium, type BrowserContext, type Page } from "playwright-core";
+import type { BrowserContext, Page } from "playwright-core";
 
 const CMC_DIAMONDS_URL = "https://coinmarketcap.com/account/my-diamonds/";
 const CMC_LOGIN_CTA =
@@ -72,6 +72,7 @@ async function liveSession(accountId: string) {
 
 export async function openLocalLogin(accountId: string) {
   await closeLocalLogin(accountId);
+  const { chromium } = await import("playwright-core");
   const profileDir = path.join(process.cwd(), ".local-browser", accountId);
   const context = await chromium.launchPersistentContext(profileDir, {
     channel: "chrome",

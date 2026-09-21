@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
+import { useLocalBrowser } from "@/lib/local-sessions";
 import { AppNav } from "@/components/nav";
 import { AccountsClient } from "./client";
 
@@ -9,7 +10,7 @@ export default async function AccountsPage() {
   return (
     <div className="min-h-screen">
       <AppNav email={user.email} role={user.role} />
-      <AccountsClient />
+      <AccountsClient browserMode={useLocalBrowser() ? "local" : "steel"} />
     </div>
   );
 }
