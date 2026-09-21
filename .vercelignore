@@ -1,0 +1,6 @@
+cookie-tool
+data
+.next
+node_modules
+*.exe
+portable

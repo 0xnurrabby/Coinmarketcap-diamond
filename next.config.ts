@@ -1,7 +1,11 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  serverExternalPackages: [
+    "@neondatabase/serverless",
+    "playwright-core",
+    "steel-sdk",
+  ],
 };
 
 export default nextConfig;

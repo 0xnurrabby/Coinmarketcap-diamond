@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CMC Cookie Tool</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: #f0f2f5;
+      color: #1a1a1a;
+      user-select: none;
+    }
+    .app {
+      max-width: 420px;
+      margin: 0 auto;
+      min-height: 100vh;
+      padding: 20px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    h1 {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 700;
+      text-align: center;
+    }
+    .sub {
+      text-align: center;
+      font-size: 12px;
+      color: #666;
+      margin: -4px 0 8px;
+    }
+    input, textarea {
+      width: 100%;
+      border: 1px solid #ccc;
+      border-radius: 10px;
+      padding: 12px;
+      font: inherit;
+      background: #fff;
+    }
+    input { height: 44px; }
+    textarea {
+      min-height: 140px;
+      font-family: Consolas, monospace;
+      font-size: 11px;
+      user-select: text;
+      resize: vertical;
+    }
+    .btns { display: flex; gap: 8px; }
+    button {
+      flex: 1;
+      height: 46px;
+      border: 0;
+      border-radius: 10px;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .login { background: #181d26; color: #fff; }
+    .done { background: #0b7a3b; color: #fff; }
+    .copy { background: #e8e8e8; color: #111; }
+    button:disabled { opacity: .45; cursor: not-allowed; }
+    .status {
+      min-height: 36px;
+      font-size: 13px;
+      color: #444;
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 10px;
+      padding: 10px 12px;
+      white-space: pre-wrap;
+    }
+    .status.err { color: #9e0a0a; background: #fff5f5; }
+    .status.ok { color: #0b7a3b; background: #f0fff4; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <h1>CMC Cookie Tool</h1>
+    <div class="sub">Login → Done → Copy → paste on website</div>
+
+    <input id="name" placeholder="Account name" value="" />
+
+    <div class="btns">
+      <button class="login" id="btnLogin">Login</button>
+      <button class="done" id="btnDone" disabled>Done</button>
+    </div>
+
+    <div class="status" id="status">Enter name, click Login.</div>
+
+    <textarea id="cookies" placeholder="Cookies will appear here after Done" readonly></textarea>
+
+    <button class="copy" id="btnCopy" disabled>Copy cookies</button>
+  </div>
+
+  <script>
+    let key = null;
+    let poll = null;
+    const $ = (id) => document.getElementById(id);
+
+    function status(text, type) {
+      const el = $("status");
+      el.textContent = text;
+      el.className = "status" + (type ? " " + type : "");
+    }
+
+    function setLive(on) {
+      $("btnDone").disabled = !on;
+      $("btnLogin").disabled = on;
+    }
+
+    $("btnLogin").onclick = async () => {
+      const name = $("name").value.trim();
+      if (!name) return status("Account name required", "err");
+      $("cookies").value = "";
+      $("btnCopy").disabled = true;
+      status("Opening browser…");
+      try {
+        const res = await fetch("/api/login", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ name }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Failed");
+        key = data.key;
+        setLive(true);
+        status("Browser open. Login to CMC (2FA/captcha OK), then click Done.");
+        if (poll) clearInterval(poll);
+        poll = setInterval(async () => {
+          if (!key) return;
+          const r = await fetch("/api/live/" + encodeURIComponent(key));
+          const d = await r.json();
+          if (!d.live) {
+            key = null;
+            setLive(false);
+            clearInterval(poll);
+            return;
+          }
+          status("Waiting for login… (" + d.cookieCount + " cookies)");
+        }, 1500);
+      } catch (e) {
+        status(e.message, "err");
+        setLive(false);
+      }
+    };
+
+    $("btnDone").onclick = async () => {
+      if (!key) return;
+      status("Capturing cookies…");
+      try {
+        const res = await fetch("/api/capture", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ key }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Failed");
+        key = null;
+        setLive(false);
+        if (poll) clearInterval(poll);
+        $("cookies").value = data.cookiesJson || "";
+        $("btnCopy").disabled = !$("cookies").value;
+        status("Done. " + data.cookieCount + " cookies. Click Copy, then paste on website Session.", "ok");
+      } catch (e) {
+        status(e.message, "err");
+      }
+    };
+
+    $("btnCopy").onclick = async () => {
+      const text = $("cookies").value;
+      if (!text) return;
+      try {
+        await navigator.clipboard.writeText(text);
+        status("Copied. Paste into website → Accounts → Session.", "ok");
+      } catch {
+        $("cookies").select();
+        document.execCommand("copy");
+        status("Copied.", "ok");
+      }
+    };
+  </script>
+</body>
+</html>

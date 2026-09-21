@@ -1,0 +1,22 @@
+{
+  "name": "diamondclaim-cookie-tool",
+  "version": "1.1.0",
+  "private": true,
+  "bin": "src/main.js",
+  "pkg": {
+    "assets": ["public/**/*"],
+    "scripts": ["src/**/*.js"],
+    "targets": ["node18-win-x64"],
+    "outputPath": "dist"
+  },
+  "scripts": {
+    "start": "node src/main.js",
+    "build": "pkg . --compress GZip -o dist/DiamondClaim-CookieTool.exe"
+  },
+  "dependencies": {
+    "ws": "^8.18.3"
+  },
+  "devDependencies": {
+    "pkg": "^5.8.1"
+  }
+}
