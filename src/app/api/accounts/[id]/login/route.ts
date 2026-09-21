@@ -1,15 +1,19 @@
 import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
 import { initDb, sql, type CmcAccount } from "@/lib/db";
+import { verifySession } from "@/lib/cmc";
 import {
   getSteelLive,
   openSteelLogin,
   releaseSteel,
 } from "@/lib/steel-sessions";
 
-export const maxDuration = 30;
+export const maxDuration = 60;
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+const VERIFY_INTERVAL_MS = 8_000;
+const lastVerifyAt = new Map<string, number>();
 
 function json(data: unknown, status = 200) {
   return NextResponse.json(data, {
@@ -65,7 +69,35 @@ export async function GET(
       SELECT id FROM cmc_accounts WHERE id = ${id} AND user_id = ${user.id} LIMIT 1
     `) as { id: string }[];
     if (!rows[0]) return json({ error: "Not found" }, 404);
-    return json(await getSteelLive(id));
+
+    const info = await getSteelLive(id);
+    if (!info.live) {
+      return json({
+        live: false,
+        cookieCount: 0,
+        viewerUrl: info.viewerUrl,
+        loginDetected: false,
+      });
+    }
+
+    // Throttled check: are the browser cookies already a logged-in CMC session?
+    let loginDetected = false;
+    const last = lastVerifyAt.get(id) ?? 0;
+    if (info.cookies.length > 0 && Date.now() - last >= VERIFY_INTERVAL_MS) {
+      lastVerifyAt.set(id, Date.now());
+      try {
+        loginDetected = (await verifySession(info.cookies)).ok;
+      } catch {
+        loginDetected = false;
+      }
+    }
+
+    return json({
+      live: true,
+      cookieCount: info.cookieCount,
+      viewerUrl: info.viewerUrl,
+      loginDetected,
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return json({ error: message, live: false, cookieCount: 0 }, 500);

@@ -120,6 +120,9 @@ export async function openSteelLogin(accountId: string) {
     WHERE id = ${accountId}
   `;
 
+  // Put the CMC login page in front of the user inside the live browser
+  await openCmcLoginPage(session.id).catch(() => null);
+
   return {
     sessionId: session.id,
     viewerUrl,
@@ -138,7 +141,13 @@ export async function getSteelLive(accountId: string) {
     | undefined;
 
   if (!row?.steel_session_id) {
-    return { live: false, cookieCount: 0, viewerUrl: null, sessionId: null };
+    return {
+      live: false,
+      cookieCount: 0,
+      cookies: [] as SteelCookie[],
+      viewerUrl: null,
+      sessionId: null,
+    };
   }
 
   let live = true;
@@ -158,9 +167,14 @@ export async function getSteelLive(accountId: string) {
     /* keep showing viewer */
   }
 
+  const cookies = live
+    ? await getSteelContextCookies(row.steel_session_id).catch(() => [])
+    : [];
+
   return {
     live,
-    cookieCount: 0,
+    cookieCount: cookies.length,
+    cookies,
     viewerUrl: row.steel_viewer_url,
     sessionId: row.steel_session_id,
   };
