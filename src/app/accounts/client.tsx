@@ -232,7 +232,13 @@ export function AccountsClient({
   }
 
   async function remove(a: Account) {
-    if (!confirm(`Delete ${a.name}?`)) return;
+    if (
+      !confirm(
+        `Delete ${a.name}? Its saved CMC session will be removed permanently.`
+      )
+    ) {
+      return;
+    }
     setBusy(a.id);
     await fetch(`/api/accounts/${a.id}`, { method: "DELETE" });
     await load();

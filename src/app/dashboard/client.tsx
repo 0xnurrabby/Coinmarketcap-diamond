@@ -358,7 +358,13 @@ export function DashboardClient({
   }
 
   async function remove(account: Account) {
-    if (!confirm(`Delete ${account.name}?`)) return;
+    if (
+      !confirm(
+        `Delete ${account.name}? Its saved CMC session will be removed permanently.`
+      )
+    ) {
+      return;
+    }
     setBusy(account.id);
     await fetch(`/api/accounts/${account.id}`, { method: "DELETE" });
     await load();
@@ -429,6 +435,13 @@ export function DashboardClient({
           <Button variant="secondary" onClick={() => setAddOpen(true)}>
             + Add account
           </Button>
+          <a
+            href="/api/backup"
+            className="inline-flex h-10 items-center justify-center rounded-full border border-hairline bg-canvas px-4 text-sm font-medium text-ink transition hover:border-border-strong"
+            title="Download a JSON backup of your accounts and activity"
+          >
+            Export
+          </a>
         </div>
       </div>
 
