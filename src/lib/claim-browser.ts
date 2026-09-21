@@ -1,5 +1,4 @@
 import type { Browser } from "playwright-core";
-import { useLocalBrowser } from "./local-sessions";
 
 export type CookiePayload = {
   name: string;
@@ -47,65 +46,28 @@ function toPlaywrightCookie(c: CookiePayload) {
   };
 }
 
-async function openSteelBrowser() {
-  const key = process.env.STEEL_API_KEY?.trim();
-  if (!key) throw new Error("STEEL_API_KEY is not set");
-
-  const res = await fetch("https://api.steel.dev/v1/sessions", {
-    method: "POST",
-    headers: { "steel-api-key": key, "content-type": "application/json" },
-    body: JSON.stringify({
-      timeout: 900_000,
-      inactivityTimeout: 600_000,
-      headless: true,
-      dimensions: { width: 1280, height: 900 },
-    }),
-  });
-  const raw = await res.text();
-  if (!res.ok) {
-    throw new Error(`Steel create failed (${res.status}): ${raw.slice(0, 200)}`);
-  }
-  const session = JSON.parse(raw) as { id: string; websocketUrl: string };
+/** Uses installed Chrome when present, otherwise the bundled Chromium. */
+async function launchBrowser(): Promise<Browser> {
   const { chromium } = await import("playwright-core");
-  const wsUrl = `${session.websocketUrl}${
-    session.websocketUrl.includes("?") ? "&" : "?"
-  }apiKey=${encodeURIComponent(key)}`;
-  const browser = await chromium.connectOverCDP(wsUrl, { timeout: 60000 });
-  return {
-    browser,
-    release: async () => {
-      await browser.close().catch(() => null);
-      await fetch(`https://api.steel.dev/v1/sessions/${session.id}/release`, {
-        method: "POST",
-        headers: { "steel-api-key": key, "content-type": "application/json" },
-        body: "{}",
-      }).catch(() => null);
-    },
-  };
+  try {
+    return await chromium.launch({ channel: "chrome", headless: true });
+  } catch {
+    return await chromium.launch({ headless: true });
+  }
 }
 
 /**
- * Claims only work from inside a real browser: CMC's WAF rejects plain
- * server-side HTTP requests with error 40110.
+ * CMC's WAF rejects plain server-side HTTP requests (error 40110), so the
+ * loyalty API is always called from inside a real browser page.
  */
 export async function withClaimBrowser<T>(
   fn: (browser: Browser) => Promise<T>
 ): Promise<T> {
-  if (useLocalBrowser()) {
-    const { chromium } = await import("playwright-core");
-    const browser = await chromium.launch({ channel: "chrome", headless: true });
-    try {
-      return await fn(browser);
-    } finally {
-      await browser.close().catch(() => null);
-    }
-  }
-
-  const { browser, release } = await openSteelBrowser();
+  const browser = await launchBrowser();
   try {
     return await fn(browser);
   } finally {
-    await release();
+    await browser.close().catch(() => null);
   }
 }
 
@@ -198,7 +160,8 @@ export async function snapshotInBrowser(
       ? (payload(data.logs) as unknown as Array<{ state?: number }>)
       : [];
     const weekStates = logs.map((l) => l?.state === 1);
-    const claimedToday = weekStates.length > 0 && weekStates[weekStates.length - 1] === true;
+    const claimedToday =
+      weekStates.length > 0 && weekStates[weekStates.length - 1] === true;
     let streak = 0;
     for (let i = weekStates.length - 1; i >= 0; i--) {
       if (!weekStates[i]) break;
