@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { appendFileSync, watch } from "node:fs";
+import { appendFileSync, readFileSync, watch } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { promisify } from "node:util";
