@@ -15,6 +15,25 @@ type Account = {
   hasSession: boolean;
 };
 
+async function readJson(res: Response) {
+  const text = await res.text();
+  try {
+    return JSON.parse(text) as Record<string, unknown>;
+  } catch {
+    throw new Error(
+      text.startsWith("<!DOCTYPE") || text.startsWith("<html")
+        ? `Server error (HTTP ${res.status}). Try again in a few seconds.`
+        : text.slice(0, 240) || `HTTP ${res.status}`
+    );
+  }
+}
+
+function openLiveWindow() {
+  const win = window.open("about:blank", "_blank");
+  if (win) win.opener = null;
+  return win;
+}
+
 export function AccountsClient() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [open, setOpen] = useState(false);
