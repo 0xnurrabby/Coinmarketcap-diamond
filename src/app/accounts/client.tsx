@@ -86,9 +86,12 @@ export function AccountsClient() {
     if (!captureId) return;
     let cancelled = false;
     let capturing = false;
+    let busyTick = false;
+    let detections = 0;
 
     const tick = async () => {
-      if (cancelled || capturing) return;
+      if (cancelled || capturing || busyTick) return;
+      busyTick = true;
       try {
         const res = await fetch(`/api/accounts/${captureId}/login`);
         if (!res.ok || cancelled) return;
@@ -104,13 +107,21 @@ export function AccountsClient() {
             : c
         );
         if (data.loginDetected) {
-          capturing = true;
-          await captureSession(captureId);
-        } else if (!data.live) {
-          setCapture(null);
+          // require two consecutive positives so a mid-reload page is not captured
+          detections += 1;
+          if (detections >= 2) {
+            capturing = true;
+            await captureSession(captureId);
+            return;
+          }
+        } else {
+          detections = 0;
         }
+        if (!data.live) setCapture(null);
       } catch {
         /* keep polling */
+      } finally {
+        busyTick = false;
       }
     };
 

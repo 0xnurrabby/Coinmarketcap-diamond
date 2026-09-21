@@ -119,7 +119,7 @@ function pickNumber(obj: unknown, keys: string[]): number | null {
 }
 
 /** Verify session looks logged-in (not guest). */
-export async function verifySession(cookies: CookiePair[]) {
+async function verifySession(cookies: CookiePair[]) {
   const hasAuthLike = cookies.some((c) =>
     /session|token|auth|uid|user|jwt|sid|cmc/i.test(c.name)
   );

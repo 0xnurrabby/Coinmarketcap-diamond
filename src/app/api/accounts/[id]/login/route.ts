@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
 import { initDb, sql } from "@/lib/db";
-import { verifySession } from "@/lib/cmc";
 import {
   getSteelLive,
+  isCmcLoggedIn,
   openSteelLogin,
   releaseSteel,
 } from "@/lib/steel-sessions";
@@ -13,7 +13,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const VERIFY_INTERVAL_MS = 8_000;
-const lastVerifyAt = new Map<string, number>();
+const verifyState = new Map<string, { at: number; detected: boolean }>();
 
 function json(data: unknown, status = 200) {
   return NextResponse.json(data, {
@@ -81,15 +81,19 @@ export async function GET(
       });
     }
 
-    // Throttled check: are the browser cookies already a logged-in CMC session?
+    // Throttled check: is the CMC page showing a logged-in session?
     let loginDetected = false;
-    const last = lastVerifyAt.get(id) ?? 0;
-    if (info.cookies.length > 0 && Date.now() - last >= VERIFY_INTERVAL_MS) {
-      lastVerifyAt.set(id, Date.now());
-      try {
-        loginDetected = (await verifySession(info.cookies)).ok;
-      } catch {
-        loginDetected = false;
+    if (info.sessionId) {
+      const prev = verifyState.get(id);
+      if (prev && Date.now() - prev.at < VERIFY_INTERVAL_MS) {
+        loginDetected = prev.detected;
+      } else {
+        try {
+          loginDetected = await isCmcLoggedIn(info.sessionId);
+        } catch {
+          loginDetected = false;
+        }
+        verifyState.set(id, { at: Date.now(), detected: loginDetected });
       }
     }
 

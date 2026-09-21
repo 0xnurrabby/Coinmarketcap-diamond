@@ -1,4 +1,5 @@
 import { initDb, sql } from "./db";
+import type { Page } from "playwright-core";
 
 function apiKey() {
   const key = process.env.STEEL_API_KEY?.trim();
@@ -22,6 +23,22 @@ export type SteelCookie = {
 };
 
 const CMC_DIAMONDS_URL = "https://coinmarketcap.com/account/my-diamonds/";
+const CMC_LOGIN_CTA =
+  'button[data-btnname="Log In to Collect"], button:has-text("Log In to Collect"), button:has-text("Log In to Complete")';
+
+async function isLoginCtaVisible(page: Page) {
+  return page
+    .locator(CMC_LOGIN_CTA)
+    .first()
+    .isVisible()
+    .catch(() => false);
+}
+
+function steelWs(sessionId: string) {
+  return `wss://connect.steel.dev?sessionId=${sessionId}&apiKey=${encodeURIComponent(
+    apiKey()
+  )}`;
+}
 
 /**
  * Navigate the Steel session to the CMC login entry point.
@@ -29,10 +46,9 @@ const CMC_DIAMONDS_URL = "https://coinmarketcap.com/account/my-diamonds/";
  */
 async function openCmcLoginPage(sessionId: string) {
   const { chromium } = await import("playwright-core");
-  const wsUrl = `wss://connect.steel.dev?sessionId=${sessionId}&apiKey=${encodeURIComponent(
-    apiKey()
-  )}`;
-  const browser = await chromium.connectOverCDP(wsUrl, { timeout: 45000 });
+  const browser = await chromium.connectOverCDP(steelWs(sessionId), {
+    timeout: 45000,
+  });
   try {
     const context = browser.contexts()[0];
     if (!context) return;
@@ -41,13 +57,37 @@ async function openCmcLoginPage(sessionId: string) {
       waitUntil: "domcontentloaded",
       timeout: 60000,
     });
-    const loginBtn = page.locator('button[data-btnname="Log In to Collect"]');
+    const loginBtn = page.locator(CMC_LOGIN_CTA).first();
     try {
-      await loginBtn.first().click({ timeout: 8000 });
+      await loginBtn.waitFor({ state: "visible", timeout: 15000 });
+      await loginBtn.click({ timeout: 8000 });
       await page.waitForTimeout(1500);
     } catch {
       /* already logged in, or modal opened by the user */
     }
+  } finally {
+    await browser.close().catch(() => null);
+  }
+}
+
+/** True only when the CMC diamonds page is loaded and no login CTA is shown. */
+export async function isCmcLoggedIn(sessionId: string) {
+  const { chromium } = await import("playwright-core");
+  const browser = await chromium.connectOverCDP(steelWs(sessionId), {
+    timeout: 45000,
+  });
+  try {
+    const context = browser.contexts()[0];
+    if (!context) return false;
+    const page = context
+      .pages()
+      .find((p) => p.url().includes("/account/my-diamonds"));
+    if (!page) return false;
+    if (await isLoginCtaVisible(page)) return false;
+    const ready = await page
+      .evaluate(() => document.readyState === "complete")
+      .catch(() => false);
+    return ready;
   } finally {
     await browser.close().catch(() => null);
   }
@@ -78,7 +118,7 @@ export async function openSteelLogin(accountId: string) {
     method: "POST",
     headers: steelHeaders(),
     body: JSON.stringify({
-      timeout: 1_800_000,
+      timeout: 900_000,
       inactivityTimeout: 900_000,
       headless: false,
       dimensions: { width: 1280, height: 900 },
@@ -190,27 +230,36 @@ export async function captureSteelCookies(accountId: string) {
     throw new Error("No live Steel session. Click Login first.");
   }
 
-  const key = apiKey();
   const sessionId = row.steel_session_id;
 
   // Dynamic import so Login route never loads Playwright
   const { chromium } = await import("playwright-core");
-  const wsUrl = `wss://connect.steel.dev?sessionId=${sessionId}&apiKey=${encodeURIComponent(key)}`;
-
-  const browser = await chromium.connectOverCDP(wsUrl, { timeout: 45000 });
+  const browser = await chromium.connectOverCDP(steelWs(sessionId), {
+    timeout: 45000,
+  });
   try {
     const context = browser.contexts()[0];
     if (!context) throw new Error("No browser context on Steel session");
 
-    // Ensure we're on CMC if user didn't navigate
+    // Make sure the diamonds page is open so we can tell guest from logged in
     const pages = context.pages();
-    const page = pages[0] || (await context.newPage());
-    const url = page.url();
-    if (!url.includes("coinmarketcap.com")) {
-      await page.goto("https://coinmarketcap.com/", {
-        waitUntil: "domcontentloaded",
-        timeout: 30000,
-      }).catch(() => null);
+    const page =
+      pages.find((p) => p.url().includes("/account/my-diamonds")) ??
+      pages[0] ??
+      (await context.newPage());
+    if (!page.url().includes("/account/my-diamonds")) {
+      await page
+        .goto(CMC_DIAMONDS_URL, {
+          waitUntil: "domcontentloaded",
+          timeout: 30000,
+        })
+        .catch(() => null);
+    }
+
+    if (await isLoginCtaVisible(page)) {
+      throw new Error(
+        "Not logged in yet. Sign in to CoinMarketCap in the live browser first."
+      );
     }
 
     const cookies = await context.cookies();

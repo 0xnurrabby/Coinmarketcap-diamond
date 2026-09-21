@@ -67,8 +67,8 @@ export async function openLoginBrowser(accountId: string) {
       "content-type": "application/json",
     },
     body: JSON.stringify({
-      // 30 minutes for 2FA / captcha
-      timeout: 1_800_000,
+      // 15 minutes for 2FA / captcha (free plan max)
+      timeout: 900_000,
       headless: false,
     }),
   });
