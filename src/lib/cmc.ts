@@ -286,6 +286,64 @@ async function claimBatch(accounts: CmcAccount[], opts?: { force?: boolean }) {
   return results;
 }
 
+export async function refreshBalancesForUser(userId: string) {
+  await initDb();
+  const accounts = (await sql`
+    SELECT * FROM cmc_accounts
+    WHERE user_id = ${userId} AND cookies_json IS NOT NULL
+    ORDER BY created_at ASC
+  `) as CmcAccount[];
+  const results: Array<Record<string, unknown>> = [];
+  if (!accounts.length) return results;
+
+  await withClaimBrowser(async (browser) => {
+    for (const account of accounts) {
+      try {
+        const cookies = parseCookies(account.cookies_json);
+        const snap = await snapshotInBrowser(
+          browser,
+          cookies as CookiePayload[],
+          false
+        );
+        if (!snap.loggedIn) {
+          await failAccount(account, "Session expired — log in again", true);
+          results.push({
+            id: account.id,
+            name: account.name,
+            ok: false,
+            message: "Session expired — log in again",
+          });
+          continue;
+        }
+        await sql`
+          UPDATE cmc_accounts SET
+            diamonds = ${snap.diamonds ?? account.diamonds},
+            streak = ${snap.streak},
+            claimed_date = ${snap.claimedToday ? todayUTC() : account.claimed_date},
+            status = 'active',
+            cookies_json = ${JSON.stringify(snap.cookies)},
+            last_error = NULL,
+            updated_at = NOW()
+          WHERE id = ${account.id}
+        `;
+        results.push({
+          id: account.id,
+          name: account.name,
+          ok: true,
+          diamonds: snap.diamonds,
+          streak: snap.streak,
+        });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Refresh failed";
+        await failAccount(account, message, false);
+        results.push({ id: account.id, name: account.name, ok: false, message });
+      }
+    }
+  });
+
+  return results;
+}
+
 export async function claimAllForUser(userId: string) {
   await initDb();
   const accounts = (await sql`
