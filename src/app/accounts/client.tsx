@@ -62,16 +62,15 @@ export function AccountsClient({
   const autoStarted = useRef(false);
 
   useEffect(() => {
-    if (autoStarted.current || !accounts) return;
+    if (autoStarted.current) return;
     const loginId = new URLSearchParams(window.location.search).get("login");
     if (!loginId) return;
+    const account = accounts.find((a) => a.id === loginId);
+    if (!account) return;
     autoStarted.current = true;
     window.history.replaceState({}, "", window.location.pathname);
-    const account = accounts.find((a) => a.id === loginId);
-    if (account) {
-      const id = window.setTimeout(() => void startLogin(account), 0);
-      return () => window.clearTimeout(id);
-    }
+    const id = window.setTimeout(() => void startLogin(account), 0);
+    return () => window.clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accounts]);
 
