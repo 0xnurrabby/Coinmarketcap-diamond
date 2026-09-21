@@ -55,6 +55,38 @@ async function git(args) {
   return stdout;
 }
 
+function mirrorRemote() {
+  try {
+    const env = readFileSync(path.join(ROOT, ".env.local"), "utf8");
+    const url = env.match(/^GITHUB_MIRROR_URL=(.+)$/m)?.[1]?.trim();
+    const token = env.match(/^GITHUB_MIRROR_TOKEN=(.+)$/m)?.[1]?.trim();
+    if (!url || !token) return null;
+    return {
+      token,
+      url: url.replace(/^https:\/\//, `https://${token}@`),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function scrub(text, token) {
+  if (!token) return text;
+  return String(text).split(token).join("***");
+}
+
+async function pushMirror() {
+  const mirror = mirrorRemote();
+  if (!mirror) return;
+  try {
+    await git(["push", mirror.url, BRANCH]);
+    log(`pushed to mirror ${mirror.url.replace(mirror.token, "***")}`);
+  } catch (e) {
+    const err = scrub(String(e.stderr || e.message), mirror.token).trim();
+    log(`mirror push failed: ${err.split("\n").slice(-1)[0]}`);
+  }
+}
+
 let timer = null;
 let busy = false;
 let dirtyWhileBusy = false;
@@ -93,6 +125,7 @@ async function flush() {
       try {
         await git(["push", "origin", BRANCH]);
         log(`pushed to origin/${BRANCH}`);
+        await pushMirror();
         return;
       } catch (e) {
         const err = String(e.stderr || e.message).trim();
