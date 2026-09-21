@@ -245,7 +245,7 @@ export function AccountsClient({
         <div>
           <h1 className="text-2xl font-medium text-ink">Accounts</h1>
           <p className="text-sm text-muted mt-1">
-            Login opens a live browser → sign in to CMC → session saved
+            Login opens a browser window → sign in to CMC → session saved
             automatically
           </p>
         </div>
@@ -367,19 +367,9 @@ export function AccountsClient({
       >
         <p className="text-sm leading-relaxed">
           {browserMode === "local"
-            ? "A Chrome window opened on this computer at the CoinMarketCap login page. Sign in there — 2FA and captcha are fine. The session is saved automatically once you are logged in."
-            : "Sign in to CoinMarketCap in the live browser. 2FA and captcha are fine — the session is captured automatically once you are logged in."}
+            ? "A Chrome window opened at the CoinMarketCap login page. Sign in there — 2FA and captcha are fine. The session is saved automatically once you are logged in."
+            : "Login opens a browser window on the computer that runs this app. On this hosted copy, log in from the app on your PC or paste cookies with the Paste button."}
         </p>
-        {capture?.viewerUrl ? (
-          <a
-            href={capture.viewerUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="mt-3 inline-flex h-10 items-center justify-center rounded-full bg-primary px-4 text-sm font-bold text-white"
-          >
-            Open live browser
-          </a>
-        ) : null}
         <p className="mt-3 text-sm text-muted">
           Waiting for login… ({capture?.cookieCount ?? 0} cookies)
         </p>
