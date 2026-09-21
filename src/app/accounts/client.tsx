@@ -30,8 +30,10 @@ async function readJson(res: Response) {
 
 export function AccountsClient({
   browserMode,
+  localAppUrl,
 }: {
   browserMode: "local" | "cloud";
+  localAppUrl: string | null;
 }) {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [open, setOpen] = useState(false);
@@ -81,7 +83,7 @@ export function AccountsClient({
   const captureId = capture?.account.id ?? null;
 
   useEffect(() => {
-    if (!captureId) return;
+    if (!captureId || browserMode !== "local") return;
     let cancelled = false;
     let capturing = false;
     let busyTick = false;
@@ -154,8 +156,12 @@ export function AccountsClient({
   }
 
   async function startLogin(account: Account, win?: Window | null) {
-    setBusy(account.id);
     setError("");
+    if (browserMode === "cloud") {
+      setCapture({ account, cookieCount: 0, viewerUrl: null });
+      return;
+    }
+    setBusy(account.id);
     try {
       const res = await fetch(`/api/accounts/${account.id}/login`, {
         method: "POST",
